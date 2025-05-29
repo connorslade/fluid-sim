@@ -1,12 +1,13 @@
-use anyhow::Result;
+#![feature(decl_macro)]
 
+use anyhow::Result;
 use tufa::{
     bindings::{StorageBuffer, UniformBuffer, mutability::Mutable},
     export::{
         egui::{self, Context},
         encase::ShaderType,
         nalgebra::Vector2,
-        wgpu::{RenderPass, ShaderStages, include_wgsl},
+        wgpu::{RenderPass, ShaderModuleDescriptor, ShaderSource, ShaderStages, include_wgsl},
         winit::{dpi::LogicalSize, window::WindowAttributes},
     },
     gpu::Gpu,
@@ -14,10 +15,24 @@ use tufa::{
     pipeline::{compute::ComputePipeline, render::RenderPipeline},
 };
 
+macro include_shader($($path:literal),+) {
+    ShaderModuleDescriptor {
+        label: None,
+        source: ShaderSource::Wgsl(
+            concat!($(include_str!(concat!("../shaders/", $path)),)*).into(),
+        ),
+    }
+}
+
 #[derive(ShaderType, Default)]
 struct Uniform {
     window: Vector2<u32>,
     domain: Vector2<u32>,
+    tick: u32,
+
+    scale_factor: f32,
+    pan: Vector2<f32>,
+    zoom: f32,
 }
 
 struct App {
@@ -34,18 +49,32 @@ impl Interactive for App {
     fn render(&mut self, gcx: GraphicsCtx, render_pass: &mut RenderPass) {
         let window = gcx.window.inner_size();
         self.ctx.window = Vector2::new(window.width, window.height);
+        self.ctx.scale_factor = gcx.window.scale_factor() as f32;
 
         self.uniform.upload(&self.ctx);
         self.render.draw_quad(render_pass, 0..1);
     }
 
-    fn ui(&mut self, _gcx: GraphicsCtx, ctx: &Context) {
+    fn ui(&mut self, gcx: GraphicsCtx, ctx: &Context) {
         egui::Window::new("Fluid Sim")
             .default_width(0.0)
             .resizable(false)
             .show(ctx, |ui| {
+                let dragging_viewport = ctx.dragged_id().is_none() && !ctx.is_pointer_over_area();
+                let scale_factor = gcx.window.scale_factor() as f32;
+                ctx.input(|input| {
+                    if input.pointer.any_down() && dragging_viewport {
+                        let delta = input.pointer.delta() * scale_factor;
+                        self.ctx.pan += Vector2::new(delta.x, -delta.y);
+                    }
+
+                    self.ctx.zoom += input.smooth_scroll_delta.y / 500.0;
+                });
+
                 if ui.button("Step").clicked() {
+                    self.uniform.upload(&self.ctx);
                     self.compute.dispatch(self.ctx.domain.push(1));
+                    self.ctx.tick += 1;
                 }
             });
     }
@@ -56,14 +85,15 @@ fn main() -> Result<()> {
     let domain = Vector2::repeat(1000);
 
     let uniform = gpu.create_uniform(&Uniform::default());
-    let state = gpu.create_storage_empty::<Vec<f32>, Mutable>((4 * domain.x * domain.y) as u64);
+    let state = gpu.create_storage_empty::<Vec<f32>, Mutable>((3 * 4 * domain.x * domain.y) as u64);
     let render = gpu
-        .render_pipeline(include_wgsl!("../shaders/render.wgsl"))
-        .bind(&uniform, ShaderStages::FRAGMENT)
+        .render_pipeline(include_shader!("types.wgsl", "render.wgsl"))
+        .bind(&uniform, ShaderStages::VERTEX_FRAGMENT)
         .bind(&state, ShaderStages::FRAGMENT)
         .finish();
     let compute = gpu
-        .compute_pipeline(include_wgsl!("../shaders/compute.wgsl"))
+        .compute_pipeline(include_shader!("types.wgsl", "compute.wgsl"))
+        .bind(&uniform)
         .bind(&state)
         .finish();
 
@@ -80,6 +110,7 @@ fn main() -> Result<()> {
 
             ctx: Uniform {
                 domain,
+                zoom: 1.0,
                 ..Uniform::default()
             },
         },
