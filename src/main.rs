@@ -4,10 +4,10 @@ use anyhow::Result;
 use tufa::{
     bindings::{StorageBuffer, UniformBuffer, mutability::Mutable},
     export::{
-        egui::{self, Context},
+        egui::{self, Context, DragValue, Key},
         encase::ShaderType,
         nalgebra::Vector2,
-        wgpu::{RenderPass, ShaderModuleDescriptor, ShaderSource, ShaderStages, include_wgsl},
+        wgpu::{RenderPass, ShaderModuleDescriptor, ShaderSource, ShaderStages},
         winit::{dpi::LogicalSize, window::WindowAttributes},
     },
     gpu::Gpu,
@@ -33,6 +33,7 @@ struct Uniform {
     scale_factor: f32,
     pan: Vector2<f32>,
     zoom: f32,
+    gain: f32,
 }
 
 struct App {
@@ -69,7 +70,13 @@ impl Interactive for App {
                         self.ctx.pan += Vector2::new(delta.x, -delta.y);
                     }
 
+                    self.running ^= input.key_pressed(Key::Space);
                     self.ctx.zoom += input.smooth_scroll_delta.y / 500.0;
+                });
+
+                ui.horizontal(|ui| {
+                    ui.add(DragValue::new(&mut self.ctx.gain));
+                    ui.label("Gain");
                 });
 
                 ui.checkbox(&mut self.running, "Running");
@@ -87,8 +94,16 @@ fn main() -> Result<()> {
     let gpu = Gpu::new()?;
     let domain = Vector2::repeat(1000);
 
-    let mut state = vec![0.0; (3 * domain.x * domain.y) as usize];
-    state[0] = 1.0;
+    let mut state = vec![0.5; (3 * domain.x * domain.y) as usize];
+
+    let center = Vector2::repeat(500_u32);
+    for y in 0..domain.y {
+        for x in 0..domain.x {
+            let dist_sq = (y - center.x).pow(2) + (x - center.y).pow(2);
+            state[(domain.x * domain.y + y * domain.x + x) as usize] =
+                (dist_sq as f32).sqrt() / 250.0 - 1.0;
+        }
+    }
 
     let uniform = gpu.create_uniform(&Uniform::default());
     let state = gpu.create_storage::<Vec<f32>, Mutable>(&state);
@@ -118,6 +133,8 @@ fn main() -> Result<()> {
             ctx: Uniform {
                 domain,
                 zoom: 1.0,
+                tick: 1,
+                gain: 1.0,
                 ..Uniform::default()
             },
         },
