@@ -12,5 +12,9 @@ fn vert(in: VertexInput) -> VertexOutput {
 
 @fragment
 fn frag(in: VertexOutput) -> @location(0) vec4<f32> {
-    return vec4(1.0, 0.0, 0.0, 0.0);
+    let coord = vec2u(in.uv * vec2f(ctx.domain));
+    let idx = index(ctx.tick, coord);
+
+    let color = state[idx];
+    return vec4(vec3(color), 0.0);
 }

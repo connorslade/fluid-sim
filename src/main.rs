@@ -43,6 +43,7 @@ struct App {
     compute: ComputePipeline,
 
     ctx: Uniform,
+    running: bool,
 }
 
 impl Interactive for App {
@@ -71,9 +72,11 @@ impl Interactive for App {
                     self.ctx.zoom += input.smooth_scroll_delta.y / 500.0;
                 });
 
-                if ui.button("Step").clicked() {
+                ui.checkbox(&mut self.running, "Running");
+                if ui.button("Step").clicked() || self.running {
                     self.uniform.upload(&self.ctx);
-                    self.compute.dispatch(self.ctx.domain.push(1));
+                    self.compute
+                        .dispatch(self.ctx.domain.map(|x| x.div_ceil(8)).push(1));
                     self.ctx.tick += 1;
                 }
             });
@@ -84,15 +87,18 @@ fn main() -> Result<()> {
     let gpu = Gpu::new()?;
     let domain = Vector2::repeat(1000);
 
+    let mut state = vec![0.0; (3 * domain.x * domain.y) as usize];
+    state[0] = 1.0;
+
     let uniform = gpu.create_uniform(&Uniform::default());
-    let state = gpu.create_storage_empty::<Vec<f32>, Mutable>((3 * 4 * domain.x * domain.y) as u64);
+    let state = gpu.create_storage::<Vec<f32>, Mutable>(&state);
     let render = gpu
-        .render_pipeline(include_shader!("types.wgsl", "render.wgsl"))
+        .render_pipeline(include_shader!("common.wgsl", "render.wgsl"))
         .bind(&uniform, ShaderStages::VERTEX_FRAGMENT)
         .bind(&state, ShaderStages::FRAGMENT)
         .finish();
     let compute = gpu
-        .compute_pipeline(include_shader!("types.wgsl", "compute.wgsl"))
+        .compute_pipeline(include_shader!("common.wgsl", "compute.wgsl"))
         .bind(&uniform)
         .bind(&state)
         .finish();
@@ -108,6 +114,7 @@ fn main() -> Result<()> {
             uniform,
             state,
 
+            running: false,
             ctx: Uniform {
                 domain,
                 zoom: 1.0,
