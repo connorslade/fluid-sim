@@ -7,7 +7,7 @@ use tufa::{
         egui::{self, Context, DragValue, Key},
         encase::ShaderType,
         nalgebra::Vector2,
-        wgpu::{RenderPass, ShaderModuleDescriptor, ShaderSource, ShaderStages},
+        wgpu::{Features, RenderPass, ShaderModuleDescriptor, ShaderSource, ShaderStages},
         winit::{dpi::LogicalSize, window::WindowAttributes},
     },
     gpu::Gpu,
@@ -29,6 +29,7 @@ struct Uniform {
     window: Vector2<u32>,
     domain: Vector2<u32>,
     tick: u32,
+    flags: u32,
 
     scale_factor: f32,
     pan: Vector2<f32>,
@@ -36,9 +37,16 @@ struct Uniform {
     gain: f32,
 }
 
+#[derive(Clone, Copy, ShaderType)]
+struct Cell {
+    pressure: f32,
+    velocity_x: f32,
+    velocity_y: f32,
+}
+
 struct App {
     uniform: UniformBuffer<Uniform>,
-    state: StorageBuffer<Vec<f32>, Mutable>,
+    state: StorageBuffer<Vec<Cell>, Mutable>,
 
     render: RenderPipeline,
     compute: ComputePipeline,
@@ -72,10 +80,15 @@ impl Interactive for App {
 
                     self.running ^= input.key_pressed(Key::Space);
                     self.ctx.zoom += input.smooth_scroll_delta.y / 500.0;
+                    self.ctx.flags ^= 0b1 * input.key_pressed(Key::Backslash) as u32;
                 });
 
                 ui.horizontal(|ui| {
-                    ui.add(DragValue::new(&mut self.ctx.gain));
+                    ui.add(
+                        DragValue::new(&mut self.ctx.gain)
+                            .speed(0.01)
+                            .range(0.0..=f32::MAX),
+                    );
                     ui.label("Gain");
                 });
 
@@ -91,22 +104,32 @@ impl Interactive for App {
 }
 
 fn main() -> Result<()> {
-    let gpu = Gpu::new()?;
+    let gpu = Gpu::builder()
+        .with_features(Features::SHADER_FLOAT32_ATOMIC)
+        .build()?;
     let domain = Vector2::repeat(1000);
 
-    let mut state = vec![0.5; (3 * domain.x * domain.y) as usize];
+    let mut state = vec![
+        Cell {
+            pressure: 0.0,
+            velocity_x: 0.0,
+            velocity_y: 0.0,
+        };
+        (3 * domain.x * domain.y) as usize
+    ];
 
     let center = Vector2::repeat(500_u32);
     for y in 0..domain.y {
         for x in 0..domain.x {
             let dist_sq = (y - center.x).pow(2) + (x - center.y).pow(2);
-            state[(domain.x * domain.y + y * domain.x + x) as usize] =
-                (dist_sq as f32).sqrt() / 250.0 - 1.0;
+            if dist_sq < 250_u32.pow(2) {
+                state[(y * domain.x + x) as usize].pressure = 1.0;
+            }
         }
     }
 
     let uniform = gpu.create_uniform(&Uniform::default());
-    let state = gpu.create_storage::<Vec<f32>, Mutable>(&state);
+    let state = gpu.create_storage::<Vec<Cell>, Mutable>(&state);
     let render = gpu
         .render_pipeline(include_shader!("common.wgsl", "render.wgsl"))
         .bind(&uniform, ShaderStages::VERTEX_FRAGMENT)
@@ -133,7 +156,7 @@ fn main() -> Result<()> {
             ctx: Uniform {
                 domain,
                 zoom: 1.0,
-                tick: 1,
+                tick: 0,
                 gain: 1.0,
                 ..Uniform::default()
             },
