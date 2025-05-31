@@ -17,11 +17,21 @@ fn frag(in: VertexOutput) -> @location(0) vec4<f32> {
 
     if (ctx.flags & 1) != 0 {
         let vel = vec2(atomicLoad(&state[idx].vx), atomicLoad(&state[idx].vy));
-        return vec4((vel / 2.0 + 0.5), 0.0, 1.0);
+        let angle = atan2(vel.y, vel.x);
+        let color = vec3(angle, 1.0, length(vel));
+        return vec4(hsv_to_rgb(color), 1.0);
+        // return vec4((vel / 2.0 + 0.5), 0.0, 1.0);
     } else {
         let val = saturate(ctx.gain * atomicLoad(&state[idx].p));
         return vec4(colormap(val), 0.0);
     }
+}
+
+// From https://web.archive.org/web/20200207113336/http://lolengine.net/blog/2013/07/27/rgb-to-hsv-in-glsl
+fn hsv_to_rgb(hsv: vec3f) -> vec3f {
+    let K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+    let p = abs(fract(hsv.xxx + K.xyz) * 6.0 - K.www);
+    return hsv.z * mix(K.xxx, saturate(p - K.xxx), hsv.y);
 }
 
 // todo: no need for the bèzier curve through colorspace
