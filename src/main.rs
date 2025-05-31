@@ -49,7 +49,8 @@ struct App {
     state: StorageBuffer<Vec<Cell>, Mutable>,
 
     render: RenderPipeline,
-    compute: ComputePipeline,
+    divergence: ComputePipeline,
+    advance: ComputePipeline,
 
     ctx: Uniform,
     running: bool,
@@ -94,9 +95,16 @@ impl Interactive for App {
 
                 ui.checkbox(&mut self.running, "Running");
                 if ui.button("Step").clicked() || self.running {
+                    let workgroups = self.ctx.domain.map(|x| x.div_ceil(8)).push(1);
+
+                    for _ in 0..10 {
+                        self.uniform.upload(&self.ctx);
+                        self.divergence.dispatch(workgroups);
+                        self.ctx.tick += 1;
+                    }
+
                     self.uniform.upload(&self.ctx);
-                    self.compute
-                        .dispatch(self.ctx.domain.map(|x| x.div_ceil(8)).push(1));
+                    self.advance.dispatch(workgroups);
                     self.ctx.tick += 1;
                 }
             });
@@ -123,7 +131,8 @@ fn main() -> Result<()> {
         for x in 0..domain.x {
             let dist_sq = (y - center.x).pow(2) + (x - center.y).pow(2);
             if dist_sq < 250_u32.pow(2) {
-                state[(y * domain.x + x) as usize].pressure = 1.0;
+                state[(y * domain.x + x) as usize].velocity_x = 0.0;
+                state[(y * domain.x + x) as usize].velocity_y = 1.0;
             }
         }
     }
@@ -135,8 +144,13 @@ fn main() -> Result<()> {
         .bind(&uniform, ShaderStages::VERTEX_FRAGMENT)
         .bind(&state, ShaderStages::FRAGMENT)
         .finish();
-    let compute = gpu
-        .compute_pipeline(include_shader!("common.wgsl", "compute.wgsl"))
+    let divergence = gpu
+        .compute_pipeline(include_shader!("common.wgsl", "divergence.wgsl"))
+        .bind(&uniform)
+        .bind(&state)
+        .finish();
+    let advance = gpu
+        .compute_pipeline(include_shader!("common.wgsl", "advance.wgsl"))
         .bind(&uniform)
         .bind(&state)
         .finish();
@@ -147,7 +161,8 @@ fn main() -> Result<()> {
             .with_inner_size(LogicalSize::new(1920, 1080)),
         App {
             render,
-            compute,
+            divergence,
+            advance,
 
             uniform,
             state,
