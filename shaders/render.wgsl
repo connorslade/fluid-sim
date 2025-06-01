@@ -15,16 +15,25 @@ fn frag(in: VertexOutput) -> @location(0) vec4<f32> {
     let coord = vec2u(in.uv * vec2f(ctx.domain));
     let idx = index(ctx.tick, coord);
 
-    if (ctx.flags & 1) != 0 {
-        let vel = vec2(atomicLoad(&state[idx].vx), atomicLoad(&state[idx].vy));
-        let angle = atan2(vel.y, vel.x);
-        let color = vec3(angle, 1.0, length(vel));
-        return vec4(hsv_to_rgb(color), 1.0);
-        // return vec4((vel / 2.0 + 0.5), 0.0, 1.0);
-    } else {
+    if ctx.view == 0 {
         let val = saturate(ctx.gain * atomicLoad(&state[idx].p));
         return vec4(colormap(val), 0.0);
+    } else if ctx.view == 1 {
+        let vel = vec2(atomicLoad(&state[idx].vx), atomicLoad(&state[idx].vy));
+        let angle = atan2(vel.y, vel.x);
+        let color = vec3(angle, 1.0, ctx.gain * length(vel));
+        return vec4(hsv_to_rgb(color), 1.0);
+    } else if ctx.view == 2 {
+        let div = divergence(coord) * ctx.gain;
+        let adiv = abs(div);
+
+        let color = vec3f(0.0, 0.0, 1.0) * f32(div > 0.0)
+                    + vec3f(1.0, 0.0, 0.0) * f32(div < 0.0);
+        return vec4(color * adiv + (1 - adiv), 1.0);
     }
+
+    // unreachable
+    return vec4(0.0);
 }
 
 // From https://web.archive.org/web/20200207113336/http://lolengine.net/blog/2013/07/27/rgb-to-hsv-in-glsl

@@ -20,13 +20,3 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     add_velocity_y(next, pos - vec2(0, 1), correction);
     set_velocity(ctx.tick + 2, pos, vec2f(0.0));
 }
-
-/// Approximates the divergence of the velocity vector field at pos.
-///
-/// div > 0, internal volume decreasing
-/// div < 0, internal volume increasing
-fn divergence(pos: vec2u) -> f32 {
-    let dx = atomicLoad(&state[index(ctx.tick, pos + vec2(1, 0))].vx) - atomicLoad(&state[index(ctx.tick, pos - vec2(1, 0))].vx);
-    let dy = atomicLoad(&state[index(ctx.tick, pos + vec2(0, 1))].vy) - atomicLoad(&state[index(ctx.tick, pos - vec2(0, 1))].vy);
-    return (dx + dy) / 2.0;
-}

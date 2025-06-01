@@ -2,7 +2,7 @@ struct Uniform {
     window: vec2u,
     domain: vec2u,
     tick: u32,
-    flags: u32,
+    view: u32,
 
     scale_factor: f32,
     pan: vec2f,
@@ -27,7 +27,19 @@ struct Cell {
 }
 
 fn index(tick: u32, pos: vec2u) -> u32 {
-    return (tick % 3 * ctx.domain.x * ctx.domain.y) + pos.y % ctx.domain.y * ctx.domain.x + pos.x % ctx.domain.x;
+    let wrapped_x = ((pos.x + ctx.domain.x) % ctx.domain.x);
+    let wrapped_y = ((pos.y + ctx.domain.y) % ctx.domain.y);
+    return (tick % 3 * ctx.domain.x * ctx.domain.y) + wrapped_y * ctx.domain.x + wrapped_x;
+}
+
+/// Approximates the divergence of the velocity vector field at pos.
+///
+/// div > 0, internal volume decreasing
+/// div < 0, internal volume increasing
+fn divergence(pos: vec2u) -> f32 {
+    let dx = atomicLoad(&state[index(ctx.tick, pos + vec2(1, 0))].vx) - atomicLoad(&state[index(ctx.tick, pos - vec2(1, 0))].vx);
+    let dy = atomicLoad(&state[index(ctx.tick, pos + vec2(0, 1))].vy) - atomicLoad(&state[index(ctx.tick, pos - vec2(0, 1))].vy);
+    return (dx + dy) / 2.0;
 }
 
 fn add_velocity_x(tick: u32, pos: vec2u, vel: f32) { atomicAdd(&state[index(tick, pos)].vx, vel); }

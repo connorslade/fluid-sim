@@ -4,7 +4,7 @@ use anyhow::Result;
 use tufa::{
     bindings::{StorageBuffer, UniformBuffer, mutability::Mutable},
     export::{
-        egui::{self, Context, DragValue, Key},
+        egui::{self, ComboBox, Context, DragValue, Key},
         encase::ShaderType,
         nalgebra::Vector2,
         wgpu::{Features, RenderPass, ShaderModuleDescriptor, ShaderSource, ShaderStages},
@@ -29,7 +29,7 @@ struct Uniform {
     window: Vector2<u32>,
     domain: Vector2<u32>,
     tick: u32,
-    flags: u32,
+    view: u32,
 
     scale_factor: f32,
     pan: Vector2<f32>,
@@ -81,7 +81,7 @@ impl Interactive for App {
 
                     self.running ^= input.key_pressed(Key::Space);
                     self.ctx.zoom += input.smooth_scroll_delta.y / 500.0;
-                    self.ctx.flags ^= 0b1 * input.key_pressed(Key::Backslash) as u32;
+                    self.ctx.view = (self.ctx.view + input.key_pressed(Key::Backslash) as u32) % 3;
                 });
 
                 ui.horizontal(|ui| {
@@ -92,6 +92,19 @@ impl Interactive for App {
                     );
                     ui.label("Gain");
                 });
+
+                ComboBox::from_label("View")
+                    .selected_text(match self.ctx.view {
+                        0 => "Pressure",
+                        1 => "Velocity",
+                        2 => "Divergence",
+                        _ => unreachable!(),
+                    })
+                    .show_ui(ui, |ui| {
+                        ui.selectable_value(&mut self.ctx.view, 0, "Pressure");
+                        ui.selectable_value(&mut self.ctx.view, 1, "Velocity");
+                        ui.selectable_value(&mut self.ctx.view, 2, "Divergence");
+                    });
 
                 ui.checkbox(&mut self.running, "Running");
                 if ui.button("Step").clicked() || self.running {
@@ -115,7 +128,7 @@ fn main() -> Result<()> {
     let gpu = Gpu::builder()
         .with_features(Features::SHADER_FLOAT32_ATOMIC)
         .build()?;
-    let domain = Vector2::repeat(1000);
+    let domain = Vector2::repeat(256);
 
     let mut state = vec![
         Cell {
@@ -126,13 +139,12 @@ fn main() -> Result<()> {
         (3 * domain.x * domain.y) as usize
     ];
 
-    let center = Vector2::repeat(500_u32);
+    let center = Vector2::repeat(128_u32);
     for y in 0..domain.y {
         for x in 0..domain.x {
             let dist_sq = (y - center.x).pow(2) + (x - center.y).pow(2);
-            if dist_sq < 250_u32.pow(2) {
-                state[(y * domain.x + x) as usize].velocity_x = 0.0;
-                state[(y * domain.x + x) as usize].velocity_y = 1.0;
+            if dist_sq < 16_u32.pow(2) {
+                state[(y * domain.x + x) as usize].velocity_x = 1.0;
             }
         }
     }
