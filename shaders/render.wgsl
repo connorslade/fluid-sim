@@ -12,19 +12,18 @@ fn vert(in: VertexInput) -> VertexOutput {
 
 @fragment
 fn frag(in: VertexOutput) -> @location(0) vec4<f32> {
-    let coord = vec2u(in.uv * vec2f(ctx.domain));
-    let idx = index(ctx.tick, coord);
+    let pos = in.uv * vec2f(ctx.domain);
 
     if ctx.view == 0 {
-        let val = saturate(ctx.gain * atomicLoad(&state[idx].p));
+        let val = saturate(ctx.gain * get_pressure_bilinear(ctx.tick, pos));
         return vec4(colormap(val), 0.0);
     } else if ctx.view == 1 {
-        let vel = vec2(atomicLoad(&state[idx].vx), atomicLoad(&state[idx].vy));
-        let angle = atan2(vel.y, vel.x);
+        let vel = get_velocity_bilinear(ctx.tick, pos);
+        let angle = atan2(vel.y, vel.x) + 3.14159265358979;
         let color = vec3(angle, 1.0, ctx.gain * length(vel));
         return vec4(hsv_to_rgb(color), 1.0);
     } else if ctx.view == 2 {
-        let div = divergence(coord) * ctx.gain;
+        let div = divergence(vec2u(pos)) * ctx.gain;
         let adiv = abs(div);
 
         let color = vec3f(0.0, 0.0, 1.0) * f32(div > 0.0)

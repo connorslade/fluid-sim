@@ -7,7 +7,8 @@ struct Uniform {
     scale_factor: f32,
     pan: vec2f,
     zoom: f32,
-    gain: f32
+    gain: f32,
+    dt: f32
 }
 
 struct VertexInput {

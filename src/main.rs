@@ -35,6 +35,7 @@ struct Uniform {
     pan: Vector2<f32>,
     zoom: f32,
     gain: f32,
+    dt: f32,
 }
 
 #[derive(Clone, Copy, ShaderType)]
@@ -91,6 +92,15 @@ impl Interactive for App {
                             .range(0.0..=f32::MAX),
                     );
                     ui.label("Gain");
+                });
+
+                ui.horizontal(|ui| {
+                    ui.add(
+                        DragValue::new(&mut self.ctx.dt)
+                            .speed(0.01)
+                            .range(0.0..=f32::MAX),
+                    );
+                    ui.label("Delta Time");
                 });
 
                 ComboBox::from_label("View")
@@ -190,6 +200,7 @@ fn main() -> Result<()> {
                 zoom: 1.0,
                 tick: 0,
                 gain: 1.0,
+                dt: 1.0,
                 ..Uniform::default()
             },
         },
