@@ -18,5 +18,6 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     add_velocity_x(next, pos - vec2(1, 0), correction);
     add_velocity_y(next, pos + vec2(0, 1), -correction);
     add_velocity_y(next, pos - vec2(0, 1), correction);
+    set_pressure(next, pos, atomicLoad(&state[index(current, pos)].p));
     set_velocity(ctx.tick + 2, pos, vec2f(0.0));
 }

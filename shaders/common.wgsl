@@ -71,3 +71,16 @@ fn add_velocity(tick: u32, pos: vec2u, val: vec2f) {
     atomicAdd(&state[index(tick, pos)].vx, val.x);
     atomicAdd(&state[index(tick, pos)].vy, val.y);
 }
+
+fn get_pressure_bilinear(tick: u32, pos: vec2f) -> f32 {
+    let bottom_left = vec2u(pos);
+    let delta = fract(pos);
+
+    return get_pressure(tick, bottom_left) * (1 - delta.x) * (1 - delta.y)
+        + get_pressure(tick, bottom_left + vec2(1, 0)) * delta.x * (1 - delta.y)
+        + get_pressure(tick, bottom_left + vec2(0, 1)) * (1 - delta.x) * delta.y
+        + get_pressure(tick, bottom_left + vec2(1, 1)) * delta.x * delta.y;
+}
+
+fn get_pressure(tick: u32, pos: vec2u) -> f32 { return atomicLoad(&state[index(tick, pos)].p); }
+fn set_pressure(tick: u32, pos: vec2u, val: f32) { atomicStore(&state[index(tick, pos)].p, val); }

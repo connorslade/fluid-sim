@@ -139,12 +139,17 @@ fn main() -> Result<()> {
         (3 * domain.x * domain.y) as usize
     ];
 
-    let center = Vector2::repeat(128_u32);
-    for y in 0..domain.y {
-        for x in 0..domain.x {
-            let dist_sq = (y - center.x).pow(2) + (x - center.y).pow(2);
-            if dist_sq < 16_u32.pow(2) {
-                state[(y * domain.x + x) as usize].velocity_x = 1.0;
+    for (center, vel_x) in [
+        (Vector2::new(128, 64_u32), 1.0),
+        (Vector2::new(128, 192), -1.0),
+    ] {
+        for y in 0..domain.y {
+            for x in 0..domain.x {
+                let dist_sq = (y - center.x).pow(2) + (x - center.y).pow(2);
+                if dist_sq < 16_u32.pow(2) {
+                    state[(y * domain.x + x) as usize].velocity_x = vel_x;
+                    state[(y * domain.x + x) as usize].pressure = 1.0;
+                }
             }
         }
     }
