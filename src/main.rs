@@ -54,6 +54,8 @@ struct App {
     advance: ComputePipeline,
 
     ctx: Uniform,
+    divergence_iterations: u32,
+    iterations: u32,
     running: bool,
 }
 
@@ -82,17 +84,12 @@ impl Interactive for App {
 
                     self.running ^= input.key_pressed(Key::Space);
                     self.ctx.zoom += input.smooth_scroll_delta.y / 500.0;
-                    self.ctx.view = (self.ctx.view + input.key_pressed(Key::Backslash) as u32) % 3;
+                    if input.key_pressed(Key::Backslash) {
+                        self.ctx.view = (self.ctx.view + 1) % 2;
+                    }
                 });
 
-                ui.horizontal(|ui| {
-                    ui.add(
-                        DragValue::new(&mut self.ctx.gain)
-                            .speed(0.01)
-                            .range(0.0..=f32::MAX),
-                    );
-                    ui.label("Gain");
-                });
+                ui.heading("Simulation");
 
                 ui.horizontal(|ui| {
                     ui.add(
@@ -102,6 +99,35 @@ impl Interactive for App {
                     );
                     ui.label("Delta Time");
                 });
+
+                ui.horizontal(|ui| {
+                    ui.add(DragValue::new(&mut self.iterations));
+                    ui.label("Iterations");
+                });
+
+                ui.horizontal(|ui| {
+                    ui.add(DragValue::new(&mut self.divergence_iterations));
+                    ui.label("Divergence");
+                });
+
+                if ui.button("Step").clicked() || self.running {
+                    let workgroups = self.ctx.domain.map(|x| x.div_ceil(8)).push(1);
+
+                    for _ in 0..self.iterations {
+                        for _ in 0..self.divergence_iterations {
+                            self.uniform.upload(&self.ctx);
+                            self.divergence.dispatch(workgroups);
+                            self.ctx.tick += 1;
+                        }
+
+                        self.uniform.upload(&self.ctx);
+                        self.advance.dispatch(workgroups);
+                        self.ctx.tick += 1;
+                    }
+                }
+
+                ui.add_space(8.0);
+                ui.heading("Rendering");
 
                 ComboBox::from_label("View")
                     .selected_text(match self.ctx.view {
@@ -116,20 +142,14 @@ impl Interactive for App {
                         ui.selectable_value(&mut self.ctx.view, 2, "Divergence");
                     });
 
-                ui.checkbox(&mut self.running, "Running");
-                if ui.button("Step").clicked() || self.running {
-                    let workgroups = self.ctx.domain.map(|x| x.div_ceil(8)).push(1);
-
-                    for _ in 0..10 {
-                        self.uniform.upload(&self.ctx);
-                        self.divergence.dispatch(workgroups);
-                        self.ctx.tick += 1;
-                    }
-
-                    self.uniform.upload(&self.ctx);
-                    self.advance.dispatch(workgroups);
-                    self.ctx.tick += 1;
-                }
+                ui.horizontal(|ui| {
+                    ui.add(
+                        DragValue::new(&mut self.ctx.gain)
+                            .speed(0.01)
+                            .range(0.0..=f32::MAX),
+                    );
+                    ui.label("Gain");
+                });
             });
     }
 }
@@ -195,6 +215,8 @@ fn main() -> Result<()> {
             state,
 
             running: false,
+            divergence_iterations: 10,
+            iterations: 1,
             ctx: Uniform {
                 domain,
                 zoom: 1.0,
