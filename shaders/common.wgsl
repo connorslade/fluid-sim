@@ -1,14 +1,19 @@
-struct Uniform {
+struct RenderUniform {
     window: vec2u,
     domain: vec2u,
-    tick: u32,
-    view: u32,
-
     scale_factor: f32,
+    tick: u32,
+
     pan: vec2f,
     zoom: f32,
     gain: f32,
-    dt: f32
+    view: u32,
+}
+
+struct ComputeUniform {
+    domain: vec2u,
+    tick: u32,
+    dt: f32,
 }
 
 struct VertexInput {
