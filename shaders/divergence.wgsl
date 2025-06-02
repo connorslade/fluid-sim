@@ -12,7 +12,7 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
     // Set divergence to zero. Guarantees that no matter is created or destroyed.
     // ∇∙V = 0
-    let correction = 1.9 * divergence(pos) / 4.0;
+    let correction = 1.9 * divergence(pos) / f32(neighbors(pos));
     add_velocity_x(next, pos, atomicLoad(&state[index(current, pos)].vx));
     add_velocity_y(next, pos, atomicLoad(&state[index(current, pos)].vy));
     add_velocity_x(next, pos + vec2(1, 0), -correction);
@@ -24,5 +24,5 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
 }
 
 fn neighbors(pos: vec2u) -> u32 {
-    return u32(pos.x != 0) + u32(pos.y != 0) + u32(pos.x + 1 != ctx.domain.x) + u32(pos.y + 1 != ctx.domain.y);
+    return u32(pos.x > 0) + u32(pos.y > 0) + u32(pos.x + 1 < ctx.domain.x) + u32(pos.y + 1 < ctx.domain.y);
 }

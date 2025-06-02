@@ -1,4 +1,7 @@
+use std::time::Duration;
+
 use encase::ShaderType;
+use ringbuffer::{ConstGenericRingBuffer, RingBuffer};
 use tufa::export::nalgebra::Vector2;
 
 #[derive(Clone, Copy, Default, ShaderType)]
@@ -22,9 +25,17 @@ pub struct State {
     pub tick: u32,
     pub dt: f32,
 
+    pub perf: Performance,
     pub divergence: u32,
     pub iterations: u32,
     pub running: bool,
+}
+
+#[derive(Default)]
+pub struct Performance {
+    divergence: ConstGenericRingBuffer<f32, 64>,
+    advance: ConstGenericRingBuffer<f32, 64>,
+    total: ConstGenericRingBuffer<f32, 64>,
 }
 
 #[repr(u32)]
@@ -75,6 +86,7 @@ impl State {
             divergence: 10,
             iterations: 1,
             running: false,
+            perf: Performance::default(),
         }
     }
 
@@ -102,12 +114,38 @@ impl State {
     }
 }
 
+impl Performance {
+    pub fn measure_divergence(&mut self, time: Duration) {
+        self.divergence.push(time.as_secs_f32());
+    }
+
+    pub fn measure_advance(&mut self, time: Duration) {
+        self.advance.push(time.as_secs_f32());
+    }
+
+    pub fn measure_total(&mut self, time: Duration) {
+        self.total.push(time.as_secs_f32());
+    }
+
+    pub fn avg_divergence(&self) -> f32 {
+        self.divergence.iter().sum::<f32>() / self.divergence.len() as f32
+    }
+
+    pub fn avg_advance(&self) -> f32 {
+        self.advance.iter().sum::<f32>() / self.advance.len() as f32
+    }
+
+    pub fn avg_total(&self) -> f32 {
+        self.total.iter().sum::<f32>() / self.total.len() as f32
+    }
+}
+
 impl View {
-    pub fn next(self) -> Self {
-        match self {
+    pub fn next(&mut self) {
+        *self = match self {
             Self::Pressure => Self::Velocity,
             _ => Self::Pressure,
-        }
+        };
     }
 
     pub fn name(&self) -> &'static str {

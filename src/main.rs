@@ -1,4 +1,7 @@
 #![feature(decl_macro)]
+#![allow(clippy::obfuscated_if_else)]
+
+use std::time::Instant;
 
 use anyhow::Result;
 use misc::include_shader;
@@ -32,6 +35,43 @@ struct App {
     state: State,
 }
 
+impl App {
+    pub fn reset(&mut self) {
+        self.state.running = false;
+        let mut cells =
+            vec![Cell::default(); (3 * self.state.domain.x * self.state.domain.y) as usize];
+        scene(&mut cells, self.state.domain);
+        self.domain.upload(&cells);
+        self.state.tick = 0;
+    }
+
+    pub fn tick(&mut self) {
+        let workgroups = self.state.domain.map(|x| x.div_ceil(8)).push(1);
+
+        let time = Instant::now();
+        for _ in 0..self.state.iterations {
+            let time = Instant::now();
+            for _ in 0..self.state.divergence {
+                self.compute_uniform.upload(&self.state.compute_uniform());
+                self.divergence.dispatch(workgroups);
+                self.state.tick += 1;
+            }
+            self.state
+                .perf
+                .measure_divergence(time.elapsed() / self.state.divergence);
+
+            let time = Instant::now();
+            self.compute_uniform.upload(&self.state.compute_uniform());
+            self.advance.dispatch(workgroups);
+            self.state.tick += 1;
+            self.state.perf.measure_advance(time.elapsed());
+        }
+        self.state
+            .perf
+            .measure_total(time.elapsed() / self.state.iterations);
+    }
+}
+
 impl Interactive for App {
     fn render(&mut self, gcx: GraphicsCtx, render_pass: &mut RenderPass) {
         let window = gcx.window.inner_size();
@@ -43,21 +83,20 @@ impl Interactive for App {
     }
 
     fn ui(&mut self, gcx: GraphicsCtx, ctx: &Context) {
-        let state = &mut self.state;
-
         let dragging_viewport = ctx.dragged_id().is_none() && !ctx.is_pointer_over_area();
         let scale_factor = gcx.window.scale_factor() as f32;
         ctx.input(|input| {
             if input.pointer.any_down() && dragging_viewport {
                 let delta = input.pointer.delta() * scale_factor;
-                state.pan += Vector2::new(delta.x, -delta.y);
+                self.state.pan += Vector2::new(delta.x, -delta.y);
             }
 
-            state.running ^= input.key_pressed(Key::Space);
-            state.zoom += input.smooth_scroll_delta.y / 500.0;
-            if input.key_pressed(Key::Backslash) {
-                state.view = state.view.next();
-            }
+            self.state.running ^= input.key_pressed(Key::Space);
+            self.state.zoom += input.smooth_scroll_delta.y / 500.0;
+            input.key_pressed(Key::Backspace).then(|| self.reset());
+            input
+                .key_pressed(Key::Backslash)
+                .then(|| self.state.view.next());
         });
 
         ui::ui(self, ctx);

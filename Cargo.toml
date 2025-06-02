@@ -6,4 +6,5 @@ edition = "2024"
 [dependencies]
 anyhow = "1.0.95"
 encase = { version = "0.10.0", features = ["nalgebra"] }
+ringbuffer = "0.15.0"
 tufa = "0.1.2"
