@@ -20,7 +20,7 @@ fn frag(in: VertexOutput) -> @location(0) vec4<f32> {
     } else if ctx.view == 1 {
         let vel = get_velocity_bilinear(ctx.tick, pos);
         let angle = atan2(vel.y, vel.x) / (2.0 * 3.14159265358979) + 0.5;
-        let color = vec3(angle * 4.0, 1.0, ctx.gain * length(vel));
+        let color = vec3(angle, 1.0, ctx.gain * length(vel));
         return vec4(hsv_to_rgb(color), 1.0);
     } else if ctx.view == 2 {
         let div = divergence(vec2u(pos)) * ctx.gain;

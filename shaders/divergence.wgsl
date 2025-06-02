@@ -5,6 +5,7 @@
 @workgroup_size(8, 8, 1)
 fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let pos = global_id.xy;
+    if !in_bounds(pos) { return; }
 
     let current = ctx.tick;
     let next = ctx.tick + 1;
@@ -20,4 +21,8 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     add_velocity_y(next, pos - vec2(0, 1), correction);
     set_pressure(next, pos, atomicLoad(&state[index(current, pos)].p));
     set_velocity(ctx.tick + 2, pos, vec2f(0.0));
+}
+
+fn neighbors(pos: vec2u) -> u32 {
+    return u32(pos.x != 0) + u32(pos.y != 0) + u32(pos.x + 1 != ctx.domain.x) + u32(pos.y + 1 != ctx.domain.y);
 }

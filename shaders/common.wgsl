@@ -28,9 +28,11 @@ struct Cell {
 }
 
 fn index(tick: u32, pos: vec2u) -> u32 {
-    let wrapped_x = ((pos.x + ctx.domain.x) % ctx.domain.x);
-    let wrapped_y = ((pos.y + ctx.domain.y) % ctx.domain.y);
-    return (tick % 3 * ctx.domain.x * ctx.domain.y) + wrapped_y * ctx.domain.x + wrapped_x;
+    return (tick % 3 * ctx.domain.x * ctx.domain.y) + pos.y * ctx.domain.x + pos.x;
+}
+
+fn in_bounds(pos: vec2u) -> bool {
+    return pos.x < ctx.domain.x && pos.y < ctx.domain.y;
 }
 
 /// Approximates the divergence of the velocity vector field at pos.

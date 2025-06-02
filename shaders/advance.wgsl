@@ -5,6 +5,8 @@
 @workgroup_size(8, 8, 1)
 fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let pos = global_id.xy;
+    if !in_bounds(pos) { return; }
+
     let vel = get_velocity(ctx.tick, pos);
     let last = vec2f(pos) - vel * ctx.dt;
 
