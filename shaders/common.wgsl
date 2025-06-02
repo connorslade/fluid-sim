@@ -8,6 +8,7 @@ struct RenderUniform {
     zoom: f32,
     gain: f32,
     view: u32,
+    contours: u32
 }
 
 struct ComputeUniform {
@@ -50,14 +51,19 @@ fn divergence(pos: vec2u) -> f32 {
     return (dx + dy) / 2.0;
 }
 
-fn add_velocity_x(tick: u32, pos: vec2u, vel: f32) { atomicAdd(&state[index(tick, pos)].vx, vel); }
-fn add_velocity_y(tick: u32, pos: vec2u, vel: f32) { atomicAdd(&state[index(tick, pos)].vy, vel); }
+fn add_velocity_x(tick: u32, pos: vec2u, vel: f32) {
+    atomicAdd(&state[index(tick, pos)].vx, vel * f32(in_bounds(pos)));
+}
+
+fn add_velocity_y(tick: u32, pos: vec2u, vel: f32) {
+    atomicAdd(&state[index(tick, pos)].vy, vel * f32(in_bounds(pos)));
+}
 
 fn get_velocity(tick: u32, pos: vec2u) -> vec2f {
     return vec2f(
         atomicLoad(&state[index(tick, pos)].vx),
         atomicLoad(&state[index(tick, pos)].vy)
-    );
+    ) * f32(in_bounds(pos));
 }
 
 fn get_velocity_bilinear(tick: u32, pos: vec2f) -> vec2f {
@@ -90,5 +96,10 @@ fn get_pressure_bilinear(tick: u32, pos: vec2f) -> f32 {
         + get_pressure(tick, bottom_left + vec2(1, 1)) * delta.x * delta.y;
 }
 
-fn get_pressure(tick: u32, pos: vec2u) -> f32 { return atomicLoad(&state[index(tick, pos)].p); }
-fn set_pressure(tick: u32, pos: vec2u, val: f32) { atomicStore(&state[index(tick, pos)].p, val); }
+fn get_pressure(tick: u32, pos: vec2u) -> f32 {
+    return atomicLoad(&state[index(tick, pos)].p) * f32(in_bounds(pos));
+}
+
+fn set_pressure(tick: u32, pos: vec2u, val: f32) {
+    atomicStore(&state[index(tick, pos)].p, val);
+}

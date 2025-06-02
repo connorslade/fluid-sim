@@ -1,6 +1,9 @@
 use tufa::export::egui::{self, ComboBox, Context, DragValue};
 
-use crate::{App, scene, types::Cell};
+use crate::{
+    App, scene,
+    types::{Cell, View},
+};
 
 pub fn ui(this: &mut App, ctx: &Context) {
     let state = &mut this.state;
@@ -26,16 +29,17 @@ pub fn ui(this: &mut App, ctx: &Context) {
             });
 
             ui.horizontal(|ui| {
-                ui.add(DragValue::new(&mut state.divergence_iterations));
+                ui.add(DragValue::new(&mut state.divergence));
                 ui.label("Divergence");
             });
 
+            ui.add_space(8.0);
             ui.horizontal(|ui| {
-                if ui.button("Step").clicked() || state.running {
+                if ui.button("▶ Step").clicked() || state.running {
                     let workgroups = state.domain.map(|x| x.div_ceil(8)).push(1);
 
                     for _ in 0..state.iterations {
-                        for _ in 0..state.divergence_iterations {
+                        for _ in 0..state.divergence {
                             this.compute_uniform.upload(&state.compute_uniform());
                             this.divergence.dispatch(workgroups);
                             state.tick += 1;
@@ -47,7 +51,7 @@ pub fn ui(this: &mut App, ctx: &Context) {
                     }
                 }
 
-                if ui.button("Reset").clicked() {
+                if ui.button("⟲ Reset").clicked() {
                     state.running = false;
                     let mut cells =
                         vec![Cell::default(); (3 * state.domain.x * state.domain.y) as usize];
@@ -61,25 +65,27 @@ pub fn ui(this: &mut App, ctx: &Context) {
             ui.heading("Rendering");
 
             ComboBox::from_label("View")
-                .selected_text(match state.view {
-                    0 => "Pressure",
-                    1 => "Velocity",
-                    2 => "Divergence",
-                    _ => unreachable!(),
-                })
+                .selected_text(state.view.name())
                 .show_ui(ui, |ui| {
-                    ui.selectable_value(&mut state.view, 0, "Pressure");
-                    ui.selectable_value(&mut state.view, 1, "Velocity");
-                    ui.selectable_value(&mut state.view, 2, "Divergence");
+                    ui.selectable_value(&mut state.view, View::Pressure, "Pressure");
+                    ui.selectable_value(&mut state.view, View::Velocity, "Velocity");
+                    ui.selectable_value(&mut state.view, View::Divergance, "Divergence");
                 });
 
             ui.horizontal(|ui| {
                 ui.add(
-                    DragValue::new(&mut state.gain)
+                    DragValue::new(&mut state.gain[state.view as usize])
                         .speed(0.01)
                         .range(0.0..=f32::MAX),
                 );
                 ui.label("Gain");
             });
+
+            if state.view == View::Velocity {
+                ui.horizontal(|ui| {
+                    ui.add(DragValue::new(&mut state.contours));
+                    ui.label("Contours");
+                });
+            }
         });
 }

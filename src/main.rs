@@ -56,7 +56,7 @@ impl Interactive for App {
             state.running ^= input.key_pressed(Key::Space);
             state.zoom += input.smooth_scroll_delta.y / 500.0;
             if input.key_pressed(Key::Backslash) {
-                state.view = (state.view + 1) % 2;
+                state.view = state.view.next();
             }
         });
 

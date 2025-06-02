@@ -13,16 +13,26 @@ pub struct State {
     pub scale_factor: f32,
     pub pan: Vector2<f32>,
     pub zoom: f32,
-    pub gain: f32,
-    pub view: u32,
+    pub view: View,
+
+    pub gain: [f32; 3],
+    pub contours: u32,
 
     pub domain: Vector2<u32>,
     pub tick: u32,
     pub dt: f32,
 
-    pub divergence_iterations: u32,
+    pub divergence: u32,
     pub iterations: u32,
     pub running: bool,
+}
+
+#[repr(u32)]
+#[derive(Clone, Copy, PartialEq)]
+pub enum View {
+    Pressure,
+    Velocity,
+    Divergance,
 }
 
 #[derive(ShaderType, Default)]
@@ -36,6 +46,7 @@ pub struct RenderUniform {
     zoom: f32,
     gain: f32,
     view: u32,
+    contours: u32,
 }
 
 #[derive(ShaderType, Default)]
@@ -52,14 +63,16 @@ impl State {
             scale_factor: 1.0,
             pan: Vector2::zeros(),
             zoom: 1.0,
-            gain: 1.0,
-            view: 0,
+
+            view: View::Pressure,
+            gain: [1.0; 3],
+            contours: 1,
 
             domain,
             tick: 0,
             dt: 1.0,
 
-            divergence_iterations: 10,
+            divergence: 10,
             iterations: 1,
             running: false,
         }
@@ -70,12 +83,13 @@ impl State {
             window: self.window,
             domain: self.domain,
             scale_factor: self.scale_factor,
-            tick: self.tick,
+            tick: self.tick - 1,
 
             pan: self.pan,
             zoom: self.zoom,
-            gain: self.gain,
-            view: self.view,
+            gain: self.gain[self.view as usize],
+            view: self.view as u32,
+            contours: self.contours,
         }
     }
 
@@ -84,6 +98,23 @@ impl State {
             domain: self.domain,
             tick: self.tick,
             dt: self.dt,
+        }
+    }
+}
+
+impl View {
+    pub fn next(self) -> Self {
+        match self {
+            Self::Pressure => Self::Velocity,
+            _ => Self::Pressure,
+        }
+    }
+
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Pressure => "Pressure",
+            Self::Velocity => "Velocity",
+            Self::Divergance => "Divergence",
         }
     }
 }
