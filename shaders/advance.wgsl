@@ -10,6 +10,7 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let vel = get_velocity(ctx.tick, pos);
     let last = vec2f(pos) - vel * ctx.dt;
 
+    // Advance the velocity and pressure fields.
     set_velocity(ctx.tick + 1, pos, get_velocity_bilinear(ctx.tick, last));
     set_pressure(ctx.tick + 1, pos, get_pressure_bilinear(ctx.tick, last));
     set_velocity(ctx.tick + 2, pos, vec2f(0.0));

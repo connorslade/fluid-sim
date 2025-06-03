@@ -28,25 +28,27 @@ pub fn ui(this: &mut App, ctx: &Context) {
                 ui.label("Divergence");
             });
 
-            ui.collapsing("Performance", |ui| {
-                egui::Grid::new("performance_table")
-                    .striped(true)
-                    .show(ui, |ui| {
-                        ui.label("Tick");
-                        ui.label(format!("{:.2}ms", this.state.perf.avg_total() * 1000.0));
-                        ui.end_row();
+            ui.add_enabled_ui(!this.state.perf.is_empty(), |ui| {
+                ui.collapsing("Performance", |ui| {
+                    egui::Grid::new("performance_table")
+                        .striped(true)
+                        .show(ui, |ui| {
+                            ui.label("Tick");
+                            ui.label(format!("{:.2}ms", this.state.perf.avg_total() * 1000.0));
+                            ui.end_row();
 
-                        ui.label("Divergence");
-                        ui.label(format!(
-                            "{:.2}ms",
-                            this.state.perf.avg_divergence() * 1000.0
-                        ));
-                        ui.end_row();
+                            ui.label("Divergence");
+                            ui.label(format!(
+                                "{:.2}ms",
+                                this.state.perf.avg_divergence() * 1000.0
+                            ));
+                            ui.end_row();
 
-                        ui.label("Advance");
-                        ui.label(format!("{:.2}ms", this.state.perf.avg_advance() * 1000.0));
-                        ui.end_row();
-                    });
+                            ui.label("Advance");
+                            ui.label(format!("{:.2}ms", this.state.perf.avg_advance() * 1000.0));
+                            ui.end_row();
+                        });
+                });
             });
 
             ui.add_space(8.0);

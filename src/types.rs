@@ -115,6 +115,10 @@ impl State {
 }
 
 impl Performance {
+    pub fn is_empty(&self) -> bool {
+        self.divergence.is_empty() && self.advance.is_empty() && self.total.is_empty()
+    }
+
     pub fn measure_divergence(&mut self, time: Duration) {
         self.divergence.push(time.as_secs_f32());
     }

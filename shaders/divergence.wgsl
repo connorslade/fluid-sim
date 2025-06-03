@@ -10,8 +10,14 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let current = ctx.tick;
     let next = ctx.tick + 1;
 
-    // Set divergence to zero. Guarantees that no matter is created or destroyed.
+    // Set divergence to zero. Guarantees that energy is conserved.
     // ∇∙V = 0
+    //
+    // This is achieved by calculating the current divergence at each cell and
+    // applying it as a correction to each neighboring cell. Because ticking all
+    // the other cells will modify the divergence of previously processed cells,
+    // this process must be iterated a few times to converge on a
+    // divergence-free solution.
     let correction = 1.9 * divergence(pos) / f32(neighbors(pos));
     add_velocity_x(next, pos, atomicLoad(&state[index(current, pos)].vx));
     add_velocity_y(next, pos, atomicLoad(&state[index(current, pos)].vy));
