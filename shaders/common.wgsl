@@ -41,6 +41,8 @@ fn in_bounds(pos: vec2u) -> bool {
     return pos.x < ctx.domain.x && pos.y < ctx.domain.y;
 }
 
+// Velocity //
+
 /// Approximates the divergence of the velocity vector field at pos.
 ///
 /// div > 0, internal volume decreasing
@@ -85,6 +87,8 @@ fn add_velocity(tick: u32, pos: vec2u, val: vec2f) {
     atomicAdd(&state[index(tick, pos)].vx, val.x);
     atomicAdd(&state[index(tick, pos)].vy, val.y);
 }
+
+// Pressure //
 
 fn get_pressure_bilinear(tick: u32, pos: vec2f) -> f32 {
     let bottom_left = vec2u(pos);

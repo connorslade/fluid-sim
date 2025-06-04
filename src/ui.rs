@@ -19,7 +19,7 @@ pub fn ui(this: &mut App, ctx: &Context) {
             });
 
             ui.horizontal(|ui| {
-                ui.add(DragValue::new(&mut this.state.iterations));
+                ui.add(DragValue::new(&mut this.state.iterations).range(1..=u32::MAX));
                 ui.label("Iterations");
             });
 
@@ -62,6 +62,7 @@ pub fn ui(this: &mut App, ctx: &Context) {
                 });
                 ui.button("⟲ Reset").clicked().then(|| this.reset());
             });
+            ui.button("💾 Download").clicked().then(|| this.download());
 
             ui.add_space(8.0);
             ui.heading("Rendering");

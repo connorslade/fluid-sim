@@ -1,10 +1,10 @@
 #![feature(decl_macro)]
 #![allow(clippy::obfuscated_if_else)]
 
-use std::time::Instant;
+use std::{fs, time::Instant};
 
 use anyhow::Result;
-use misc::include_shader;
+use misc::{include_shader, timestamp};
 use tufa::{
     bindings::{StorageBuffer, UniformBuffer, mutability::Mutable},
     export::{
@@ -70,6 +70,29 @@ impl App {
             .perf
             .measure_total(time.elapsed() / self.state.iterations);
     }
+
+    pub fn download(&self) {
+        let State { tick, domain, .. } = self.state;
+
+        self.domain.download_async(move |state| {
+            let count = domain.x * domain.y;
+            let start_idx = (tick % 3 * count) as usize;
+            let cells = &state[start_idx..(start_idx + count as usize)];
+
+            let mut out = Vec::<u8>::with_capacity(4 * 3 * cells.len() + 4 * 2);
+            out.extend(domain.x.to_le_bytes());
+            out.extend(domain.y.to_le_bytes());
+            for cell in cells {
+                out.extend(cell.pressure.to_le_bytes());
+                out.extend(cell.velocity_x.to_le_bytes());
+                out.extend(cell.velocity_y.to_le_bytes());
+            }
+
+            let timestamp = timestamp();
+            let _ = fs::create_dir_all("states");
+            fs::write(format!("states/{timestamp}.bin"), out).unwrap();
+        });
+    }
 }
 
 impl Interactive for App {
@@ -83,17 +106,20 @@ impl Interactive for App {
     }
 
     fn ui(&mut self, gcx: GraphicsCtx, ctx: &Context) {
-        let dragging_viewport = ctx.dragged_id().is_none() && !ctx.is_pointer_over_area();
         let scale_factor = gcx.window.scale_factor() as f32;
+        let pointer_over_ui = ctx.is_pointer_over_area();
         ctx.input(|input| {
+            let dragging_viewport = input.pointer.middle_down() && !pointer_over_ui;
             if input.pointer.any_down() && dragging_viewport {
                 let delta = input.pointer.delta() * scale_factor;
                 self.state.pan += Vector2::new(delta.x, -delta.y);
             }
 
-            self.state.running ^= input.key_pressed(Key::Space);
             self.state.zoom += input.smooth_scroll_delta.y / 500.0;
-            input.key_pressed(Key::Backspace).then(|| self.reset());
+            self.state.running ^= input.key_pressed(Key::Space);
+
+            input.key_pressed(Key::T).then(|| self.tick());
+            input.key_pressed(Key::R).then(|| self.reset());
             input
                 .key_pressed(Key::Backslash)
                 .then(|| self.state.view.next());
@@ -152,7 +178,7 @@ fn main() -> Result<()> {
 
 fn scene(state: &mut [Cell], size: Vector2<u32>) {
     for (center, vel_x) in [
-        (Vector2::new(128, 64_u32), 1.0),
+        (Vector2::new(120, 64_u32), 1.0),
         (Vector2::new(128, 192), -1.0),
     ] {
         for y in 0..size.y {

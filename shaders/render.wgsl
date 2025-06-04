@@ -20,7 +20,7 @@ fn frag(in: VertexOutput) -> @location(0) vec4<f32> {
     } else if ctx.view == 1 {
         let vel = get_velocity_bilinear(ctx.tick, pos);
         let angle = atan2(vel.y, vel.x) / (2.0 * 3.14159265358979) + 0.5;
-        let color = vec3(angle * f32(ctx.contours), 1.0, ctx.gain * length(vel));
+        let color = vec3(angle * f32(ctx.contours), 1.0, saturate(ctx.gain * length(vel)));
         return vec4(hsv_to_rgb(color), 1.0);
     } else if ctx.view == 2 {
         let div = divergence(vec2u(pos)) * ctx.gain;
@@ -35,7 +35,7 @@ fn frag(in: VertexOutput) -> @location(0) vec4<f32> {
     return vec4(0.0);
 }
 
-// From https://web.archive.org/web/20200207113336/http://lolengine.net/blog/2013/07/27/rgb-to-hsv-in-glsl
+// Modified from https://web.archive.org/web/20200207113336/http://lolengine.net/blog/2013/07/27/rgb-to-hsv-in-glsl
 fn hsv_to_rgb(hsv: vec3f) -> vec3f {
     let K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
     let p = abs(fract(hsv.xxx + K.xyz) * 6.0 - K.www);
