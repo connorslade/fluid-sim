@@ -63,7 +63,7 @@ for (i, state_file) in enumerate(states)
 	append!(data, [(i-1, angle) for angle in angles])
 
 	fig = f[div(i-1, n), mod(i-1, n)]
-	ax = Axis(fig, aspect=DataAspect(), title="θ=$(map(θ -> round(θ, digits=2), angles))")
+	ax = Axis(fig, aspect=DataAspect())
 	heatmap!(ax, map(x -> x > PRESSURE_THRESHOLD, pressure))
 	hidedecorations!(ax)
 
