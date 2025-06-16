@@ -1,5 +1,6 @@
 @group(0) @binding(0) var<uniform> ctx: ComputeUniform;
 @group(0) @binding(1) var<storage, read_write> state: array<Cell>;
+@group(0) @binding(2) var<storage, read> walls: array<u32>;
 
 @compute
 @workgroup_size(8, 8, 1)
@@ -30,5 +31,8 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
 }
 
 fn neighbors(pos: vec2u) -> u32 {
-    return u32(pos.x > 0) + u32(pos.y > 0) + u32(pos.x + 1 < ctx.domain.x) + u32(pos.y + 1 < ctx.domain.y);
+    return u32(in_bounds(pos + vec2(1, 0)))
+        + u32(in_bounds(pos - vec2(1, 0)))
+        + u32(in_bounds(pos + vec2(0, 1)))
+        + u32(in_bounds(pos - vec2(0, 1)));
 }

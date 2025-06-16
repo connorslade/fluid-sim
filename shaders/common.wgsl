@@ -37,8 +37,13 @@ fn index(tick: u32, pos: vec2u) -> u32 {
     return (tick % 3 * ctx.domain.x * ctx.domain.y) + pos.y * ctx.domain.x + pos.x;
 }
 
+fn is_wall(pos: vec2u) -> bool {
+    let idx = index(0, vec2u(pos));
+    return (walls[idx / 32] & (1u << (idx % 32))) != 0;
+}
+
 fn in_bounds(pos: vec2u) -> bool {
-    return pos.x < ctx.domain.x && pos.y < ctx.domain.y;
+    return pos.x < ctx.domain.x && pos.y < ctx.domain.y && !is_wall(pos);
 }
 
 // Velocity //

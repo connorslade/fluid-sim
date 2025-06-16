@@ -1,5 +1,6 @@
 @group(0) @binding(0) var<uniform> ctx: RenderUniform;
 @group(0) @binding(1) var<storage, read_write> state: array<Cell>;
+@group(0) @binding(2) var<storage, read> walls: array<u32>;
 
 @vertex
 fn vert(in: VertexInput) -> VertexOutput {
@@ -13,6 +14,7 @@ fn vert(in: VertexInput) -> VertexOutput {
 @fragment
 fn frag(in: VertexOutput) -> @location(0) vec4<f32> {
     let pos = in.uv * vec2f(ctx.domain);
+    if is_wall(vec2u(pos)) { return vec4(0.0); }
 
     if ctx.view == 0 {
         let val = saturate(ctx.gain * get_pressure_bilinear(ctx.tick, pos));

@@ -4,9 +4,13 @@
 use std::{fs, time::Instant};
 
 use anyhow::Result;
+use image::{GenericImageView, imageops::FilterType};
 use misc::{include_shader, timestamp};
 use tufa::{
-    bindings::{StorageBuffer, UniformBuffer, mutability::Mutable},
+    bindings::{
+        StorageBuffer, UniformBuffer,
+        mutability::{Immutable, Mutable},
+    },
     export::{
         egui::{Context, Key},
         nalgebra::Vector2,
@@ -38,10 +42,11 @@ struct App {
 impl App {
     pub fn reset(&mut self) {
         self.state.running = false;
-        let mut cells =
-            vec![Cell::default(); (3 * self.state.domain.x * self.state.domain.y) as usize];
-        scene(&mut cells, self.state.domain);
-        self.domain.upload(&cells);
+        let cells = (self.state.domain.x * self.state.domain.y) as usize;
+        let mut state = vec![Cell::default(); 3 * cells];
+        let mut walls = vec![0u32; cells.div_ceil(32)]; // todo: split walls to separate function
+        scene(&mut state, &mut walls, self.state.domain);
+        self.domain.upload(&state);
         self.state.tick = 0;
     }
 
@@ -135,26 +140,37 @@ fn main() -> Result<()> {
         .build()?;
 
     let size = Vector2::repeat(256);
-    let mut state = vec![Cell::default(); (3 * size.x * size.y) as usize];
-    scene(&mut state, size);
+    let cells = (size.x * size.y) as usize;
+
+    // Array of cells, making up the simulation domain
+    let mut state = vec![Cell::default(); 3 * cells];
+    // Bitfield denoting of each cell is a wall or not.
+    let mut walls = vec![0u32; cells.div_ceil(32)];
+
+    // Populate the state and wall bit-field with a default state
+    scene(&mut state, &mut walls, size);
 
     let compute_uniform = gpu.create_uniform(&ComputeUniform::default());
     let render_uniform = gpu.create_uniform(&RenderUniform::default());
     let domain = gpu.create_storage::<Vec<Cell>, Mutable>(&state);
+    let walls = gpu.create_storage::<Vec<u32>, Immutable>(&walls);
     let render = gpu
         .render_pipeline(include_shader!("common.wgsl", "render.wgsl"))
         .bind(&render_uniform, ShaderStages::VERTEX_FRAGMENT)
         .bind(&domain, ShaderStages::FRAGMENT)
+        .bind(&walls, ShaderStages::FRAGMENT)
         .finish();
     let divergence = gpu
         .compute_pipeline(include_shader!("common.wgsl", "divergence.wgsl"))
         .bind(&compute_uniform)
         .bind(&domain)
+        .bind(&walls)
         .finish();
     let advance = gpu
         .compute_pipeline(include_shader!("common.wgsl", "advance.wgsl"))
         .bind(&compute_uniform)
         .bind(&domain)
+        .bind(&walls)
         .finish();
 
     gpu.create_window(
@@ -176,18 +192,17 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn scene(state: &mut [Cell], size: Vector2<u32>) {
-    for (center, vel_x) in [
-        (Vector2::new(120, 64_u32), 1.0),
-        (Vector2::new(128, 192), -1.0),
-    ] {
-        for y in 0..size.y {
-            for x in 0..size.x {
-                let dist_sq = (y - center.x).pow(2) + (x - center.y).pow(2);
-                if dist_sq < 16_u32.pow(2) {
-                    state[(y * size.x + x) as usize].velocity_x = vel_x;
-                    state[(y * size.x + x) as usize].pressure = 1.0;
-                }
+fn scene(state: &mut [Cell], walls: &mut [u32], size: Vector2<u32>) {
+    let mask =
+        image::open("airfoil-mask.png")
+            .unwrap()
+            .resize(size.x, size.y, FilterType::Triangle);
+    for y in 0..size.y {
+        for x in 0..size.x {
+            if mask.get_pixel(x, y).0[0] < 128 {
+                // todo: use a struct to wrap the bitvec
+                let idx = (y * size.x + x) as usize;
+                walls[idx / 32] |= 1 << (idx % 32);
             }
         }
     }
